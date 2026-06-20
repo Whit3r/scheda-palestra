@@ -14,7 +14,6 @@
   body {
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
     color:#F4F1EA;
-    padding-bottom: 40px;
     max-width: 480px;
     margin: 0 auto;
     -webkit-user-select: none;
@@ -22,7 +21,7 @@
     padding-top: env(safe-area-inset-top);
     padding-bottom: calc(40px + env(safe-area-inset-bottom));
   }
-  input { -webkit-user-select: text; user-select: text; }
+  input, textarea { -webkit-user-select: text; user-select: text; }
   button { font-family: inherit; -webkit-appearance: none; appearance: none; }
 
   .header { padding: 20px 18px 0 18px; position: sticky; top: 0; background:#0E0F12; z-index: 5; }
@@ -43,10 +42,18 @@
   .day-sub-header { padding:18px 18px 10px 18px; display:flex; justify-content:space-between; align-items:flex-end; }
   .day-title { font-size:20px; font-weight:700; }
   .day-sub { font-size:13px; color:#8A92A6; margin-top:2px; }
-  .day-progress-wrap { width:120px; }
+  .day-progress-wrap { width:130px; }
   .day-progress-track { height:6px; background:#1A1C22; border-radius:4px; overflow:hidden; }
   .day-progress-fill { height:100%; background:#FF4D2E; transition:width 0.3s ease; }
   .day-progress-text { font-size:11px; color:#8A92A6; margin-top:4px; text-align:right; }
+
+  .suggested-row {
+    margin-bottom:14px; background:#1A1410; border:1px solid #3A2A1D; border-radius:10px;
+    padding:10px 12px; display:flex; align-items:center; justify-content:space-between;
+  }
+  .suggested-label { font-size:12px; color:#B8BCC8; }
+  .suggested-value { font-size:14px; font-weight:700; color:#FF8A6C; }
+  .suggested-tag { font-size:10px; color:#666B78; margin-top:1px; }
 
   .list { padding:4px 18px; display:flex; flex-direction:column; gap:10px; }
 
@@ -65,7 +72,11 @@
 
   .card-body { padding:0 14px 16px 14px; display:none; }
   .card-body.open { display:block; }
-  .tip { font-size:13px; color:#B8BCC8; line-height:1.45; margin-bottom:14px; }
+  .tip { font-size:13px; color:#B8BCC8; line-height:1.45; margin-bottom:10px; }
+
+  .last-time-row {
+    font-size:11px; color:#666B78; margin-bottom:12px; display:flex; align-items:center; gap:5px;
+  }
 
   .set-header-row { display:flex; gap:8px; align-items:center; margin-bottom:6px; padding-left:2px; }
   .set-header-label { flex:1; font-size:11px; color:#666B78; text-align:center; }
@@ -80,6 +91,7 @@
     flex:1; background:#1F2128; border:1px solid #2C2F38; border-radius:10px;
     padding:10px 8px; color:#F4F1EA; font-size:15px; text-align:center; min-width:0;
   }
+  .set-input.prefilled { color:#8A92A6; }
   .check-btn {
     width:38px; height:38px; border-radius:10px; border:1.5px solid #3A3E48;
     font-size:15px; font-weight:700; color:#0E0F12; cursor:pointer; flex-shrink:0; background:transparent;
@@ -87,9 +99,17 @@
   .check-btn.done { background:#2ECC71; border-color:#2ECC71; }
 
   .hint-row { font-size:11px; color:#52565F; text-align:center; margin-top:4px; }
-  .footer-note { text-align:center; font-size:11px; color:#52565F; padding:10px 30px 0 30px; }
 
-  /* Modal */
+  .note-wrap { margin-top:12px; }
+  .note-input {
+    width:100%; background:#1F2128; border:1px solid #2C2F38; border-radius:10px;
+    padding:9px 10px; color:#F4F1EA; font-size:13px; font-family:inherit; resize:none;
+  }
+  .note-input::placeholder { color:#52565F; }
+
+  .footer-note { text-align:center; font-size:11px; color:#52565F; padding:14px 30px 0 30px; }
+
+  /* Modal timer */
   .modal-overlay {
     position:fixed; inset:0; background:rgba(8,9,11,0.94);
     display:none; align-items:center; justify-content:center; z-index:50; padding:20px;
@@ -218,7 +238,15 @@ const DAYS = [
 ];
 
 const STORAGE_KEY = "workout-log-v1";
+const NOTES_KEY = "workout-notes-v1";
 const todayISO = () => new Date().toISOString().slice(0,10);
+
+function suggestedWeight(exId, lastSets) {
+  if (!lastSets) return null;
+  const kgs = lastSets.filter(s => s && s.done && s.kg).map(s => parseFloat(s.kg));
+  if (!kgs.length) return null;
+  return { value: Math.max(...kgs), source: "lastTime" };
+}
 
 function loadLog() {
   try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) || {}; }
@@ -227,11 +255,41 @@ function loadLog() {
 function saveLog(log) {
   try { localStorage.setItem(STORAGE_KEY, JSON.stringify(log)); } catch(e) { console.error(e); }
 }
+function loadNotes() {
+  try { return JSON.parse(localStorage.getItem(NOTES_KEY)) || {}; }
+  catch { return {}; }
+}
+function saveNotes(notes) {
+  try { localStorage.setItem(NOTES_KEY, JSON.stringify(notes)); } catch(e) { console.error(e); }
+}
 
 let log = loadLog();
+let notes = loadNotes();
 let activeDay = DAYS[0].id;
 let expandedId = null;
 const dayKey = () => `${todayISO()}__${activeDay}`;
+const noteKey = (exId) => `${dayKey()}__${exId}`;
+
+/* Trova l'ultima sessione (data diversa da oggi) in cui è stato fatto questo esercizio,
+   e ne restituisce i valori kg/reps serie per serie, così possiamo pre-compilare. */
+function lastSessionFor(exId) {
+  let bestDate = null;
+  let bestSets = null;
+  Object.keys(log).forEach(key => {
+    const parts = key.split("__");
+    if (parts.length !== 2) return;
+    const date = parts[0];
+    if (date === todayISO()) return; // ignora oggi stesso
+    const dl = log[key];
+    const sets = dl[exId];
+    if (!sets || !sets.some(s => s && s.done)) return;
+    if (bestDate === null || date > bestDate) {
+      bestDate = date;
+      bestSets = sets;
+    }
+  });
+  return bestSets;
+}
 
 /* ---------- RENDER ---------- */
 function fmtRest(s) {
@@ -239,11 +297,9 @@ function fmtRest(s) {
 }
 
 function render() {
-  // date chip
   document.getElementById("dateChip").textContent =
     new Date().toLocaleDateString("it-IT", { weekday:"short", day:"numeric", month:"short" });
 
-  // tabs
   const tabRow = document.getElementById("tabRow");
   tabRow.innerHTML = "";
   DAYS.forEach(d => {
@@ -296,7 +352,23 @@ function render() {
     const body = document.createElement("div");
     body.className = "card-body" + (isOpen ? " open" : "");
 
-    let bodyHtml = `<div class="tip">${ex.tip}</div>
+    const lastSets = lastSessionFor(ex.id);
+    const suggestion = suggestedWeight(ex.id, lastSets);
+
+    let bodyHtml = `<div class="tip">${ex.tip}</div>`;
+
+    if (suggestion) {
+      bodyHtml += `
+        <div class="suggested-row">
+          <div>
+            <div class="suggested-label">💡 Peso usato la volta scorsa</div>
+            <div class="suggested-tag">Regolati da qui</div>
+          </div>
+          <div class="suggested-value">${suggestion.value}kg</div>
+        </div>`;
+    }
+
+    bodyHtml += `
       <div class="set-header-row">
         <div class="set-num" style="background:transparent;"></div>
         <div class="set-header-label">kg</div>
@@ -305,37 +377,78 @@ function render() {
       </div>`;
 
     for (let i = 0; i < ex.sets; i++) {
-      const v = sets[i] || { kg:"", reps:"", done:false };
+      const v = sets[i];
+      const lastV = lastSets ? lastSets[i] : null;
+      // Pre-compila kg: priorità al valore di oggi, poi all'ultima volta, poi alla stima generale (solo prima serie)
+      let kgVal = "";
+      let isPrefilledKg = false;
+      if (v && v.kg) {
+        kgVal = v.kg;
+      } else if (lastV && lastV.kg) {
+        kgVal = lastV.kg;
+        isPrefilledKg = true;
+      } else if (i === 0 && suggestion) {
+        kgVal = suggestion.value;
+        isPrefilledKg = true;
+      }
+      const repsVal = v && v.reps ? v.reps : (lastV && lastV.reps ? lastV.reps : "");
+      const isPrefilledReps = !(v && v.reps) && lastV && lastV.reps;
+      const done = v && v.done;
+
       bodyHtml += `
-        <div class="set-row${v.done ? ' done' : ''}">
+        <div class="set-row${done ? ' done' : ''}">
           <div class="set-num">${i+1}</div>
-          <input class="set-input" type="number" inputmode="decimal" placeholder="kg"
-            value="${v.kg || ''}" data-ex="${ex.id}" data-set="${i}" data-field="kg" />
-          <input class="set-input" type="number" inputmode="numeric" placeholder="${ex.reps.split('-')[0] || 'rip'}"
-            value="${v.reps || ''}" data-ex="${ex.id}" data-set="${i}" data-field="reps" />
-          <button class="check-btn${v.done ? ' done' : ''}" data-ex="${ex.id}" data-set="${i}" data-rest="${ex.rest}" data-name="${ex.name}">
-            ${v.done ? '✓' : '⏱'}
+          <input class="set-input${isPrefilledKg ? ' prefilled' : ''}" type="number" inputmode="decimal" placeholder="kg"
+            value="${kgVal}" data-ex="${ex.id}" data-set="${i}" data-field="kg" />
+          <input class="set-input${isPrefilledReps ? ' prefilled' : ''}" type="number" inputmode="numeric" placeholder="${ex.reps.split('-')[0] || 'rip'}"
+            value="${repsVal}" data-ex="${ex.id}" data-set="${i}" data-field="reps" />
+          <button class="check-btn${done ? ' done' : ''}" data-ex="${ex.id}" data-set="${i}" data-rest="${ex.rest}" data-name="${ex.name}">
+            ${done ? '✓' : '⏱'}
           </button>
         </div>`;
     }
     bodyHtml += `<div class="hint-row">Tocca ⏱ quando finisci una serie: parte il timer di recupero</div>`;
+    bodyHtml += `<div class="note-wrap">
+        <textarea class="note-input" rows="2" placeholder="Note (es. sensazioni, fastidi, varianti)..."
+          data-note-ex="${ex.id}">${(notes[noteKey(ex.id)] || '')}</textarea>
+      </div>`;
+
     body.innerHTML = bodyHtml;
     card.appendChild(body);
     list.appendChild(card);
   });
 
-  // bind inputs
+  // bind inputs: se l'utente tocca un campo pre-compilato, lo "promuove" a valore reale di oggi
   list.querySelectorAll(".set-input").forEach(inp => {
     inp.addEventListener("input", (e) => {
       const { ex, set, field } = e.target.dataset;
+      e.target.classList.remove("prefilled");
       updateSet(ex, parseInt(set), field, e.target.value);
     });
+    inp.addEventListener("focus", (e) => {
+      e.target.classList.remove("prefilled");
+    });
   });
-  // bind check buttons
+
   list.querySelectorAll(".check-btn").forEach(btn => {
     btn.addEventListener("click", (e) => {
       const { ex, set, rest, name } = e.target.dataset;
-      toggleDone(ex, parseInt(set), parseInt(rest), name, parseInt(set)+1);
+      // Assicura che il valore visualizzato (anche se pre-compilato e mai toccato) venga salvato
+      const idx = parseInt(set);
+      const row = e.target.closest(".set-row");
+      const kgInput = row.querySelector('[data-field="kg"]');
+      const repsInput = row.querySelector('[data-field="reps"]');
+      if (kgInput.value) updateSet(ex, idx, "kg", kgInput.value, { silent: true });
+      if (repsInput.value) updateSet(ex, idx, "reps", repsInput.value, { silent: true });
+      toggleDone(ex, idx, parseInt(rest), name, idx + 1);
+    });
+  });
+
+  list.querySelectorAll(".note-input").forEach(ta => {
+    ta.addEventListener("input", (e) => {
+      const exId = e.target.dataset.noteEx;
+      notes[noteKey(exId)] = e.target.value;
+      saveNotes(notes);
     });
   });
 }
@@ -367,9 +480,9 @@ function toggleDone(exId, setIdx, rest, name, setNumber) {
 /* ---------- REST TIMER (basato su timestamp reale, sopravvive al background) ---------- */
 const TIMER_KEY = "workout-timer-v1";
 let timerInterval = null;
-let total = 0;          // durata totale impostata (s)
-let endAt = 0;           // epoch ms in cui il riposo finisce
-let pausedRemaining = null; // se in pausa, secondi rimanenti congelati
+let total = 0;
+let endAt = 0;
+let pausedRemaining = null;
 let beepedForThisTimer = false;
 let audioCtx = null;
 
@@ -457,11 +570,9 @@ function updateTimerDisplay() {
 
 document.getElementById("pauseBtn").onclick = () => {
   if (pausedRemaining === null) {
-    // metti in pausa
     pausedRemaining = currentRemaining();
     document.getElementById("pauseBtn").textContent = "▶ Riprendi";
   } else {
-    // riprendi
     endAt = Date.now() + pausedRemaining * 1000;
     total = Math.max(total, pausedRemaining);
     pausedRemaining = null;
@@ -496,8 +607,6 @@ document.getElementById("plus15").onclick = () => {
   updateTimerDisplay();
 };
 
-// Quando l'app torna in primo piano, ricalcola subito (essenziale: il setInterval
-// si ferma in background, ma endAt è un timestamp assoluto quindi resta corretto)
 document.addEventListener("visibilitychange", () => {
   if (document.visibilityState === "visible") {
     const overlay = document.getElementById("modalOverlay");
@@ -512,7 +621,6 @@ document.addEventListener("visibilitychange", () => {
   }
 });
 
-// Al caricamento della pagina, riprendi un timer eventualmente lasciato attivo
 (function resumePersistedTimer() {
   const saved = loadPersistedTimer();
   if (!saved) return;
@@ -521,8 +629,6 @@ document.addEventListener("visibilitychange", () => {
   pausedRemaining = saved.pausedRemaining;
   beepedForThisTimer = saved.beepedForThisTimer;
   if (currentRemaining() <= 0 && pausedRemaining === null) {
-    // riposo già concluso mentre l'app era chiusa: non riaprire la modale automaticamente,
-    // l'utente vedrà comunque "pronto" nelle card. Pulisco lo stato.
     clearPersistedTimer();
     return;
   }
