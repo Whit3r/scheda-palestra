@@ -1,0 +1,541 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="Scheda" />
+<title>Scheda Allenamento</title>
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin:0; padding:0; background:#0E0F12; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    color:#F4F1EA;
+    padding-bottom: 40px;
+    max-width: 480px;
+    margin: 0 auto;
+    -webkit-user-select: none;
+    user-select: none;
+    padding-top: env(safe-area-inset-top);
+    padding-bottom: calc(40px + env(safe-area-inset-bottom));
+  }
+  input { -webkit-user-select: text; user-select: text; }
+  button { font-family: inherit; -webkit-appearance: none; appearance: none; }
+
+  .header { padding: 20px 18px 0 18px; position: sticky; top: 0; background:#0E0F12; z-index: 5; }
+  .header-top { display:flex; justify-content:space-between; align-items:flex-start; margin-bottom: 18px; }
+  .brand { font-size:13px; letter-spacing:3px; font-weight:700; color:#FF4D2E; }
+  .brand-sub { font-size:22px; font-weight:700; margin-top:2px; }
+  .date-chip { font-size:12px; color:#8A92A6; background:#1A1C22; padding:6px 10px; border-radius:20px; text-transform:capitalize; }
+
+  .tab-row { display:flex; gap:8px; margin-bottom:4px; }
+  .tab {
+    flex:1; background:#1A1C22; border:1px solid #262A33; border-radius:12px;
+    padding:10px 8px; cursor:pointer; color:#8A92A6; text-align:center;
+  }
+  .tab.active { background:#1F2128; border:1px solid #FF4D2E; color:#F4F1EA; }
+  .tab-label { font-size:10px; letter-spacing:1px; opacity:0.7; }
+  .tab-title { font-size:14px; font-weight:700; margin-top:2px; }
+
+  .day-sub-header { padding:18px 18px 10px 18px; display:flex; justify-content:space-between; align-items:flex-end; }
+  .day-title { font-size:20px; font-weight:700; }
+  .day-sub { font-size:13px; color:#8A92A6; margin-top:2px; }
+  .day-progress-wrap { width:120px; }
+  .day-progress-track { height:6px; background:#1A1C22; border-radius:4px; overflow:hidden; }
+  .day-progress-fill { height:100%; background:#FF4D2E; transition:width 0.3s ease; }
+  .day-progress-text { font-size:11px; color:#8A92A6; margin-top:4px; text-align:right; }
+
+  .list { padding:4px 18px; display:flex; flex-direction:column; gap:10px; }
+
+  .card { background:#15171C; border:1px solid #262A33; border-radius:16px; overflow:hidden; }
+  .card.all-done { border-color:#2ECC71; }
+  .card-header {
+    width:100%; display:flex; align-items:center; gap:10px;
+    background:transparent; border:none; padding:14px 14px; cursor:pointer; color:inherit; text-align:left;
+  }
+  .card-title { font-size:15px; font-weight:600; }
+  .card-meta { font-size:12px; color:#8A92A6; margin-top:3px; }
+  .progress-pill { font-size:12px; font-weight:700; border-radius:20px; padding:4px 9px; min-width:32px; text-align:center; background:#262A33; color:#8A92A6; }
+  .progress-pill.all-done { background:#2ECC71; color:#0E0F12; }
+  .chevron { color:#8A92A6; font-size:18px; transition:transform 0.2s ease; }
+  .chevron.open { transform:rotate(180deg); }
+
+  .card-body { padding:0 14px 16px 14px; display:none; }
+  .card-body.open { display:block; }
+  .tip { font-size:13px; color:#B8BCC8; line-height:1.45; margin-bottom:14px; }
+
+  .set-header-row { display:flex; gap:8px; align-items:center; margin-bottom:6px; padding-left:2px; }
+  .set-header-label { flex:1; font-size:11px; color:#666B78; text-align:center; }
+
+  .set-row { display:flex; gap:8px; align-items:center; margin-bottom:8px; }
+  .set-row.done { opacity:0.85; }
+  .set-num {
+    width:22px; height:22px; border-radius:50%; background:#262A33; color:#8A92A6;
+    font-size:11px; font-weight:700; display:flex; align-items:center; justify-content:center; flex-shrink:0;
+  }
+  .set-input {
+    flex:1; background:#1F2128; border:1px solid #2C2F38; border-radius:10px;
+    padding:10px 8px; color:#F4F1EA; font-size:15px; text-align:center; min-width:0;
+  }
+  .check-btn {
+    width:38px; height:38px; border-radius:10px; border:1.5px solid #3A3E48;
+    font-size:15px; font-weight:700; color:#0E0F12; cursor:pointer; flex-shrink:0; background:transparent;
+  }
+  .check-btn.done { background:#2ECC71; border-color:#2ECC71; }
+
+  .hint-row { font-size:11px; color:#52565F; text-align:center; margin-top:4px; }
+  .footer-note { text-align:center; font-size:11px; color:#52565F; padding:10px 30px 0 30px; }
+
+  /* Modal */
+  .modal-overlay {
+    position:fixed; inset:0; background:rgba(8,9,11,0.94);
+    display:none; align-items:center; justify-content:center; z-index:50; padding:20px;
+  }
+  .modal-overlay.open { display:flex; }
+  .modal-card {
+    background:#15171C; border:1px solid #FF4D2E; border-radius:24px; padding:28px 28px 32px 28px;
+    display:flex; flex-direction:column; align-items:center; width:100%; max-width:340px;
+  }
+  .modal-badge {
+    display:flex; align-items:center; gap:6px;
+    background:#3A1F14; color:#FF8A6C; font-size:11px; font-weight:700; letter-spacing:1.5px;
+    padding:6px 12px; border-radius:20px; margin-bottom:14px;
+  }
+  .modal-label { font-size:17px; font-weight:700; text-align:center; }
+  .modal-sub { font-size:13px; color:#8A92A6; margin-top:4px; }
+  .timer-wrap { position:relative; margin:24px 0; width:220px; height:220px; }
+  .timer-center {
+    position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center;
+  }
+  .timer-text { font-size:40px; font-weight:700; font-variant-numeric:tabular-nums; letter-spacing:1px; color:#F4F1EA; }
+  .timer-text.done { color:#2ECC71; }
+  .timer-center-label { font-size:11px; color:#666B78; margin-top:6px; font-weight:700; letter-spacing:2px; }
+  .ring-bg { stroke:#2A2D36; }
+  .ring-fg { stroke:#FF4D2E; transition: stroke-dashoffset 1s linear; }
+  .ring-fg.done { stroke:#2ECC71; }
+
+  .adjust-row { display:flex; gap:10px; margin-bottom:22px; }
+  .adjust-btn {
+    background:#1F2128; border:1px solid #2C2F38; color:#B8BCC8;
+    border-radius:10px; padding:8px 16px; font-size:13px; cursor:pointer;
+  }
+  .modal-actions { display:flex; gap:10px; width:100%; }
+  .secondary-btn {
+    flex:1; background:transparent; border:1.5px solid #2C2F38; color:#F4F1EA;
+    border-radius:12px; padding:13px 0; font-size:14px; font-weight:600; cursor:pointer;
+  }
+  .primary-btn {
+    flex:1; background:#FF4D2E; border:none; color:#0E0F12;
+    border-radius:12px; padding:13px 0; font-size:14px; font-weight:700; cursor:pointer;
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-top">
+    <div>
+      <div class="brand">SCHEDA</div>
+      <div class="brand-sub">Push · Pull · Legs</div>
+    </div>
+    <div class="date-chip" id="dateChip"></div>
+  </div>
+  <div class="tab-row" id="tabRow"></div>
+</div>
+
+<div class="day-sub-header">
+  <div>
+    <div class="day-title" id="dayTitle"></div>
+    <div class="day-sub" id="daySub"></div>
+  </div>
+  <div class="day-progress-wrap">
+    <div class="day-progress-track"><div class="day-progress-fill" id="dayProgressFill"></div></div>
+    <div class="day-progress-text" id="dayProgressText"></div>
+  </div>
+</div>
+
+<div class="list" id="list"></div>
+
+<div class="footer-note">I dati restano salvati su questo dispositivo (anche offline).</div>
+
+<div class="modal-overlay" id="modalOverlay">
+  <div class="modal-card">
+    <div class="modal-badge"><span>⏱</span><span>TIMER DI RECUPERO</span></div>
+    <div class="modal-label" id="modalLabel"></div>
+    <div class="modal-sub" id="modalSub"></div>
+    <div class="timer-wrap">
+      <svg width="220" height="220" style="transform:rotate(-90deg)">
+        <circle class="ring-bg" cx="110" cy="110" r="103" stroke-width="14" fill="none"/>
+        <circle class="ring-fg" id="ringFg" cx="110" cy="110" r="103" stroke-width="14" fill="none"
+          stroke-linecap="round" stroke-dasharray="647.2" stroke-dashoffset="0"/>
+      </svg>
+      <div class="timer-center">
+        <span class="timer-text" id="timerText">00:00</span>
+        <span class="timer-center-label" id="timerLabel">RIPOSO</span>
+      </div>
+    </div>
+    <div class="adjust-row">
+      <button class="adjust-btn" id="minus15">-15s</button>
+      <button class="adjust-btn" id="plus15">+15s</button>
+    </div>
+    <div class="modal-actions">
+      <button class="secondary-btn" id="pauseBtn">⏸ Pausa</button>
+      <button class="primary-btn" id="closeModalBtn">Salta</button>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ---------- DATA ---------- */
+const DAYS = [
+  { id:"push", label:"Giorno 1", title:"Push", sub:"Petto · Spalle · Tricipiti", exercises:[
+    { id:"panca-piana", name:"Panca piana bilanciere", sets:4, reps:"6-8", rest:180, tip:"Scendi controllato fino a sfiorare il petto, spingi senza bloccare di scatto i gomiti." },
+    { id:"panca-inclinata", name:"Panca inclinata manubri", sets:3, reps:"8-10", rest:120, tip:"Inclinazione 30-45°, scendi fino a sentire stiramento al petto." },
+    { id:"military-press", name:"Military press bilanciere", sets:4, reps:"6-8", rest:150, tip:"Spingi sopra la testa mantenendo il core stabile, senza inarcare la lombare." },
+    { id:"alzate-laterali", name:"Alzate laterali manubri", sets:3, reps:"12-15", rest:75, tip:"Gomiti leggermente flessi, solleva fino all'altezza spalle, senza slanci." },
+    { id:"dip", name:"Dip alle parallele", sets:3, reps:"8-10", rest:120, tip:"Busto leggermente in avanti, scendi a 90° di flessione gomito." },
+    { id:"french-press", name:"French press / Pushdown", sets:3, reps:"10-12", rest:90, tip:"Gomiti fissi, estendi senza muoverli." },
+  ]},
+  { id:"pull", label:"Giorno 2", title:"Pull", sub:"Schiena · Bicipiti", exercises:[
+    { id:"stacco", name:"Stacco da terra / rumeno", sets:4, reps:"5-6", rest:180, tip:"Schiena neutra, bilanciere vicino agli stinchi, spingi con i talloni." },
+    { id:"trazioni", name:"Trazioni / Lat machine", sets:4, reps:"6-10", rest:150, tip:"Tira portando il petto verso la sbarra, scendi controllato." },
+    { id:"rematore", name:"Rematore bilanciere/manubrio", sets:3, reps:"8-10", rest:120, tip:"Busto inclinato ~45°, tira verso l'addome, gomiti vicino ai fianchi." },
+    { id:"pulley", name:"Pulley basso", sets:3, reps:"10-12", rest:90, tip:"Tira la maniglia verso l'addome senza slancio del busto." },
+    { id:"curl-bil", name:"Curl bilanciere", sets:3, reps:"8-10", rest:90, tip:"Gomiti fissi ai fianchi, niente slancio del busto." },
+    { id:"curl-martello", name:"Curl martello", sets:3, reps:"10-12", rest:75, tip:"Presa neutra, gomiti fermi." },
+  ]},
+  { id:"legs", label:"Giorno 3", title:"Legs", sub:"Gambe · Addominali", exercises:[
+    { id:"squat", name:"Squat bilanciere", sets:4, reps:"6-8", rest:180, tip:"Scendi spingendo le anche indietro fino a coscia parallela al suolo." },
+    { id:"leg-press", name:"Leg press", sets:3, reps:"10-12", rest:120, tip:"Scendi controllato fino a 90°, non bloccare di scatto in alto." },
+    { id:"stacco-rumeno", name:"Stacco rumeno / Leg curl", sets:3, reps:"8-10", rest:120, tip:"Gambe quasi tese, spingi le anche indietro, schiena neutra." },
+    { id:"affondi", name:"Affondi / Leg extension", sets:3, reps:"10-12", rest:90, tip:"Passo lungo, scendi finché entrambe le ginocchia formano 90°." },
+    { id:"calf", name:"Calf raise in piedi", sets:4, reps:"12-15", rest:60, tip:"Sali sulle punte, pausa in contrazione, scendi fino a stiramento." },
+    { id:"plank", name:"Plank / Addominali", sets:3, reps:"max", rest:60, tip:"Corpo in linea retta, contrai addome e glutei." },
+  ]},
+];
+
+const STORAGE_KEY = "workout-log-v1";
+const todayISO = () => new Date().toISOString().slice(0,10);
+
+function loadLog() {
+  try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) || {}; }
+  catch { return {}; }
+}
+function saveLog(log) {
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(log)); } catch(e) { console.error(e); }
+}
+
+let log = loadLog();
+let activeDay = DAYS[0].id;
+let expandedId = null;
+const dayKey = () => `${todayISO()}__${activeDay}`;
+
+/* ---------- RENDER ---------- */
+function fmtRest(s) {
+  return s < 60 ? `${s}s` : `${(s/60).toFixed(s % 60 === 0 ? 0 : 1)}min`;
+}
+
+function render() {
+  // date chip
+  document.getElementById("dateChip").textContent =
+    new Date().toLocaleDateString("it-IT", { weekday:"short", day:"numeric", month:"short" });
+
+  // tabs
+  const tabRow = document.getElementById("tabRow");
+  tabRow.innerHTML = "";
+  DAYS.forEach(d => {
+    const btn = document.createElement("button");
+    btn.className = "tab" + (d.id === activeDay ? " active" : "");
+    btn.innerHTML = `<div class="tab-label">${d.label}</div><div class="tab-title">${d.title}</div>`;
+    btn.onclick = () => { activeDay = d.id; expandedId = null; render(); };
+    tabRow.appendChild(btn);
+  });
+
+  const currentDay = DAYS.find(d => d.id === activeDay);
+  const dl = log[dayKey()] || {};
+
+  document.getElementById("dayTitle").textContent = currentDay.title;
+  document.getElementById("daySub").textContent = currentDay.sub;
+
+  const totalSets = currentDay.exercises.reduce((a,e) => a + e.sets, 0);
+  const doneSets = currentDay.exercises.reduce((a,e) => {
+    const sets = dl[e.id] || [];
+    return a + sets.filter(s => s && s.done).length;
+  }, 0);
+  document.getElementById("dayProgressFill").style.width = totalSets ? `${(doneSets/totalSets)*100}%` : "0%";
+  document.getElementById("dayProgressText").textContent = `${doneSets}/${totalSets} serie`;
+
+  const list = document.getElementById("list");
+  list.innerHTML = "";
+
+  currentDay.exercises.forEach(ex => {
+    const sets = Array.from({length: ex.sets}, (_,i) => dl[ex.id]?.[i]);
+    const doneCount = sets.filter(s => s && s.done).length;
+    const allDone = doneCount === ex.sets;
+    const isOpen = expandedId === ex.id;
+
+    const card = document.createElement("div");
+    card.className = "card" + (allDone ? " all-done" : "");
+
+    const header = document.createElement("button");
+    header.className = "card-header";
+    header.innerHTML = `
+      <div style="flex:1; text-align:left; min-width:0;">
+        <div class="card-title">${ex.name}</div>
+        <div class="card-meta">${ex.sets}×${ex.reps} · ⏱ riposo ${fmtRest(ex.rest)}</div>
+      </div>
+      <div class="progress-pill${allDone ? ' all-done' : ''}">${doneCount}/${ex.sets}</div>
+      <span class="chevron${isOpen ? ' open' : ''}">⌄</span>
+    `;
+    header.onclick = () => { expandedId = isOpen ? null : ex.id; render(); };
+    card.appendChild(header);
+
+    const body = document.createElement("div");
+    body.className = "card-body" + (isOpen ? " open" : "");
+
+    let bodyHtml = `<div class="tip">${ex.tip}</div>
+      <div class="set-header-row">
+        <div class="set-num" style="background:transparent;"></div>
+        <div class="set-header-label">kg</div>
+        <div class="set-header-label">rip</div>
+        <div style="width:38px; font-size:10px; color:#666B78; text-align:center;">⏱</div>
+      </div>`;
+
+    for (let i = 0; i < ex.sets; i++) {
+      const v = sets[i] || { kg:"", reps:"", done:false };
+      bodyHtml += `
+        <div class="set-row${v.done ? ' done' : ''}">
+          <div class="set-num">${i+1}</div>
+          <input class="set-input" type="number" inputmode="decimal" placeholder="kg"
+            value="${v.kg || ''}" data-ex="${ex.id}" data-set="${i}" data-field="kg" />
+          <input class="set-input" type="number" inputmode="numeric" placeholder="${ex.reps.split('-')[0] || 'rip'}"
+            value="${v.reps || ''}" data-ex="${ex.id}" data-set="${i}" data-field="reps" />
+          <button class="check-btn${v.done ? ' done' : ''}" data-ex="${ex.id}" data-set="${i}" data-rest="${ex.rest}" data-name="${ex.name}">
+            ${v.done ? '✓' : '⏱'}
+          </button>
+        </div>`;
+    }
+    bodyHtml += `<div class="hint-row">Tocca ⏱ quando finisci una serie: parte il timer di recupero</div>`;
+    body.innerHTML = bodyHtml;
+    card.appendChild(body);
+    list.appendChild(card);
+  });
+
+  // bind inputs
+  list.querySelectorAll(".set-input").forEach(inp => {
+    inp.addEventListener("input", (e) => {
+      const { ex, set, field } = e.target.dataset;
+      updateSet(ex, parseInt(set), field, e.target.value);
+    });
+  });
+  // bind check buttons
+  list.querySelectorAll(".check-btn").forEach(btn => {
+    btn.addEventListener("click", (e) => {
+      const { ex, set, rest, name } = e.target.dataset;
+      toggleDone(ex, parseInt(set), parseInt(rest), name, parseInt(set)+1);
+    });
+  });
+}
+
+function updateSet(exId, setIdx, field, value) {
+  const dl = log[dayKey()] || {};
+  const arr = dl[exId] || [];
+  const v = arr[setIdx] || { kg:"", reps:"", done:false };
+  v[field] = value;
+  arr[setIdx] = v;
+  dl[exId] = arr;
+  log[dayKey()] = dl;
+  saveLog(log);
+}
+
+function toggleDone(exId, setIdx, rest, name, setNumber) {
+  const dl = log[dayKey()] || {};
+  const arr = dl[exId] || [];
+  const v = arr[setIdx] || { kg:"", reps:"", done:false };
+  v.done = !v.done;
+  arr[setIdx] = v;
+  dl[exId] = arr;
+  log[dayKey()] = dl;
+  saveLog(log);
+  render();
+  if (v.done) startRestTimer(name, setNumber, rest);
+}
+
+/* ---------- REST TIMER (basato su timestamp reale, sopravvive al background) ---------- */
+const TIMER_KEY = "workout-timer-v1";
+let timerInterval = null;
+let total = 0;          // durata totale impostata (s)
+let endAt = 0;           // epoch ms in cui il riposo finisce
+let pausedRemaining = null; // se in pausa, secondi rimanenti congelati
+let beepedForThisTimer = false;
+let audioCtx = null;
+
+const RING_CIRC = 2 * Math.PI * 103;
+
+function beep() {
+  try {
+    audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+    if (audioCtx.state === "suspended") audioCtx.resume();
+    [0, 0.18, 0.36].forEach((t, i) => {
+      const o = audioCtx.createOscillator();
+      const g = audioCtx.createGain();
+      o.type = "sine";
+      o.frequency.value = i === 2 ? 880 : 660;
+      g.gain.setValueAtTime(0.0001, audioCtx.currentTime + t);
+      g.gain.exponentialRampToValueAtTime(0.3, audioCtx.currentTime + t + 0.02);
+      g.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + t + 0.16);
+      o.connect(g).connect(audioCtx.destination);
+      o.start(audioCtx.currentTime + t);
+      o.stop(audioCtx.currentTime + t + 0.2);
+    });
+  } catch(e) {}
+  try { if (navigator.vibrate) navigator.vibrate([200,80,200,80,300]); } catch(e) {}
+}
+
+function persistTimerState(name, setNumber) {
+  try {
+    localStorage.setItem(TIMER_KEY, JSON.stringify({ name, setNumber, total, endAt, pausedRemaining, beepedForThisTimer }));
+  } catch(e) {}
+}
+function clearPersistedTimer() {
+  try { localStorage.removeItem(TIMER_KEY); } catch(e) {}
+}
+function loadPersistedTimer() {
+  try { return JSON.parse(localStorage.getItem(TIMER_KEY)); } catch(e) { return null; }
+}
+
+function currentRemaining() {
+  if (pausedRemaining !== null) return pausedRemaining;
+  return Math.max(0, Math.round((endAt - Date.now()) / 1000));
+}
+
+function startRestTimer(name, setNumber, duration) {
+  total = duration;
+  endAt = Date.now() + duration * 1000;
+  pausedRemaining = null;
+  beepedForThisTimer = false;
+  document.getElementById("modalLabel").textContent = name;
+  document.getElementById("modalSub").textContent = `Serie ${setNumber} completata`;
+  document.getElementById("modalOverlay").classList.add("open");
+  document.getElementById("pauseBtn").textContent = "⏸ Pausa";
+  persistTimerState(name, setNumber);
+  updateTimerDisplay();
+  clearInterval(timerInterval);
+  timerInterval = setInterval(tick, 1000);
+}
+
+function tick() {
+  const r = currentRemaining();
+  if (r <= 0 && !beepedForThisTimer) {
+    beepedForThisTimer = true;
+    beep();
+    persistTimerState(document.getElementById("modalLabel").textContent, null);
+  }
+  updateTimerDisplay();
+}
+
+function updateTimerDisplay() {
+  const remaining = currentRemaining();
+  const mm = String(Math.floor(remaining/60)).padStart(2,'0');
+  const ss = String(remaining%60).padStart(2,'0');
+  const done = remaining === 0;
+  const timerText = document.getElementById("timerText");
+  timerText.textContent = `${mm}:${ss}`;
+  timerText.className = "timer-text" + (done ? " done" : "");
+  document.getElementById("timerLabel").textContent = done ? "RIPOSO FINITO" : "RIPOSO";
+  document.getElementById("closeModalBtn").textContent = done ? "Prossima serie →" : "Salta";
+
+  const progress = total > 0 ? 1 - remaining/total : 0;
+  const ring = document.getElementById("ringFg");
+  ring.setAttribute("stroke-dasharray", RING_CIRC);
+  ring.setAttribute("stroke-dashoffset", RING_CIRC * (1 - progress));
+  ring.className.baseVal = "ring-fg" + (done ? " done" : "");
+}
+
+document.getElementById("pauseBtn").onclick = () => {
+  if (pausedRemaining === null) {
+    // metti in pausa
+    pausedRemaining = currentRemaining();
+    document.getElementById("pauseBtn").textContent = "▶ Riprendi";
+  } else {
+    // riprendi
+    endAt = Date.now() + pausedRemaining * 1000;
+    total = Math.max(total, pausedRemaining);
+    pausedRemaining = null;
+    document.getElementById("pauseBtn").textContent = "⏸ Pausa";
+  }
+  persistTimerState(document.getElementById("modalLabel").textContent, null);
+  updateTimerDisplay();
+};
+document.getElementById("closeModalBtn").onclick = () => {
+  clearInterval(timerInterval);
+  clearPersistedTimer();
+  document.getElementById("modalOverlay").classList.remove("open");
+};
+document.getElementById("minus15").onclick = () => {
+  if (pausedRemaining !== null) {
+    pausedRemaining = Math.max(0, pausedRemaining - 15);
+  } else {
+    endAt -= 15000;
+  }
+  total = Math.max(currentRemaining(), total);
+  persistTimerState(document.getElementById("modalLabel").textContent, null);
+  updateTimerDisplay();
+};
+document.getElementById("plus15").onclick = () => {
+  if (pausedRemaining !== null) {
+    pausedRemaining += 15;
+  } else {
+    endAt += 15000;
+  }
+  total = Math.max(currentRemaining(), total);
+  persistTimerState(document.getElementById("modalLabel").textContent, null);
+  updateTimerDisplay();
+};
+
+// Quando l'app torna in primo piano, ricalcola subito (essenziale: il setInterval
+// si ferma in background, ma endAt è un timestamp assoluto quindi resta corretto)
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "visible") {
+    const overlay = document.getElementById("modalOverlay");
+    if (overlay.classList.contains("open") && pausedRemaining === null) {
+      const r = currentRemaining();
+      if (r <= 0 && !beepedForThisTimer) {
+        beepedForThisTimer = true;
+        beep();
+      }
+      updateTimerDisplay();
+    }
+  }
+});
+
+// Al caricamento della pagina, riprendi un timer eventualmente lasciato attivo
+(function resumePersistedTimer() {
+  const saved = loadPersistedTimer();
+  if (!saved) return;
+  total = saved.total;
+  endAt = saved.endAt;
+  pausedRemaining = saved.pausedRemaining;
+  beepedForThisTimer = saved.beepedForThisTimer;
+  if (currentRemaining() <= 0 && pausedRemaining === null) {
+    // riposo già concluso mentre l'app era chiusa: non riaprire la modale automaticamente,
+    // l'utente vedrà comunque "pronto" nelle card. Pulisco lo stato.
+    clearPersistedTimer();
+    return;
+  }
+  document.getElementById("modalLabel").textContent = saved.name || "";
+  document.getElementById("modalSub").textContent = saved.setNumber ? `Serie ${saved.setNumber} completata` : "";
+  document.getElementById("modalOverlay").classList.add("open");
+  document.getElementById("pauseBtn").textContent = pausedRemaining !== null ? "▶ Riprendi" : "⏸ Pausa";
+  updateTimerDisplay();
+  clearInterval(timerInterval);
+  timerInterval = setInterval(tick, 1000);
+})();
+
+render();
+</script>
+</body>
+</html>
